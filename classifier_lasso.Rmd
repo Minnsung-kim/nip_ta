@@ -6,7 +6,7 @@ author:
   - name: 김민성 
     url: https://minnsung-kim.github.io
     affiliation: 명지대
-date: "2010-10-01"
+date: "2022-10-01"
 output: 
   distill::distill_article:
     toc: true
