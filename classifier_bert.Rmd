@@ -1,7 +1,7 @@
 ---
 title: "캡스톤 프로젝트"
 description: |
-  TDB
+  TBD
 author:
   - name: 김민성 
     url: https://minnsung-kim.github.io
