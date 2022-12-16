@@ -1,12 +1,12 @@
 ---
 title: "대통령 연설문 예측"
 description: |
-  TBD
+  텍스트 분류모형을 개발하고, DTM의 종류별 성능의 차이를 비교해봅니다.
 author:
   - name: 김민성 
     url: https://minnsung-kim.github.io
     affiliation: 명지대
-date: "2022-10-01"
+date: "2022-12-16"
 output: 
   distill::distill_article:
     toc: true
@@ -28,4 +28,270 @@ library(dplyr, warn.conflicts = FALSE)
 library(ggplot2, warn.conflicts = FALSE)
 
 xaringanExtra :: use_panelset()
+```
+
+
+
+
+## 준비하기
+
+### 패키지 로드하기
+
+텍스트 분류모델 개발을 위한 패키지를 로드합니다.
+
+```{r}
+
+library(tidyverse)
+library(tidymodels)
+library(text2vec)
+library(glmnet)
+library(caret)
+library(bitTA)
+library(doParallel)
+
+```
+
+
+## 데이터셋 샘플링
+
+initial_split(), initial_split(), initial_split() 함수로 원 데이터를 학습 : 평가 = 70% : 30%로 분리를 수행합니다.
+
+```{r}
+set.seed(123)
+ president_split <- rsample::initial_split(president_speech, prop = 7/8, strata = president)
+president_smpl <- rsample::testing(president_split)
+```
+
+### 데이터셋 분리
+
+비로소 모델 개발을 위한 데이터 셋을 분리합니다
+
+initial_split(), initial_split(), initial_split() 함수로 원 데이터를 학습 : 평가 = 70% : 30%로 분리를 수행합니다.
+
+```{r}
+set.seed(123)
+president_split <- initial_split(president_smpl, prop = 0.7, strata = president)
+
+train <- rsample::training(president_split)
+test <- rsample::testing(president_split)
+```
+
+## Vectorization
+
+모델링을 위해서 비정형데이터인 documents 데이터를 vector로 변환해야 합니다. 이 경우 엄청난 데이터의 증가가 필연적으로 따라옵니다. 그래서 연산 속도의 개선을 위해서 vectorization 구조로 연산을 해야하기 때문에 Vectorization 연산을 수행하기 위한 구조로 변환해야 합니다. 최종 구조는 DTM(Document Term Matrix)로  생성합니다.
+
+## Frequency 기반의 DTM 생성
+
+### tokenize 반복기 정의
+
+itoken_parallel() 함수로 tokenize 반복기를 정의합니다.
+
+```{r}
+# 띄어쓰기 단위로 토큰을 생성
+
+token_fun <- text2vec::word_tokenizer
+
+it_train <- itoken(train$doc, 
+                   tokenizer = token_fun, 
+                   ids = train$id, 
+                   progressbar = FALSE)
+
+it_test <- itoken(test$doc,
+                  tokenizer = token_fun, 
+                  ids = test$id, 
+                  progressbar = FALSE)
+```
+
+
+### Vocabulary 생성
+
+
+```{r}
+
+nc <- parallel::detectCores()
+registerDoParallel(cores = nc)
+
+vocab <- create_vocabulary(it_train)
+
+tail(vocab, n = 10)
+```
+
+### Document Term Matrix 생성하기
+
+documents taxonomy 분류 모델을 수행하는 데이터셋은 DTM(Document Term Matrix) 구조여야 합니다. 그래서 vocabulary를 DTM으로 변환하는 작업을 수행합니다. text2vec::create_dtm() 함수를 사용합니다.
+
+```{r}
+vectorizer <-  vocab_vectorizer(vocab)
+
+dtm_train_tf <- text2vec::create_dtm(it_train, vectorizer)
+dim(dtm_train_tf)
+
+dtm_test_tf <- text2vec::create_dtm(it_test, vectorizer)
+dim(dtm_test_tf)
+```
+
+## N-Grams 기반의 DTM 생성
+
+N-grams은 N개의 연속된 terms의 조합을 terms로 간주하여 vocabulary를 생성하고 이 데이터 기반으로 모델을 생성합니다. 파편화된 terms이 아니기 때문에 일반적인 vocabulary를 이용한 분석보다는 좀 더 정확하게 문맥을 파악할 수 있는 장점이 있습니다.
+
+### Vocabulary 생성
+
+```{r}
+vocab_bigram <- create_vocabulary(it_train, ngram = c(1L, 2L))
+dim(vocab_bigram)
+```
+### Prune Vocabulary
+
+Documents의 개수가 증가하거나 Documents의 길이가 증가하면, Vocabulary의 규모도 증가합니다. 이것은 모델을 생성하는데 많은 컴퓨팅 리소스를 소모해서 속도가 느려지게 됩니다. 그래서 모델에 영향을 덜 줄 수 있는 terms를 제거하는 작업이 필요합니다.
+
+```{r}
+vocab_bigram <- vocab_bigram %>% 
+  prune_vocabulary(term_count_min = 10,
+                   doc_proportion_max = 0.5)
+dim(vocab_bigram)
+```
+
+### Documents Term Matrix 생성
+```{r}
+vectorizer_bigram <- vocab_vectorizer(vocab_bigram)
+
+dtm_train_bigram <- create_dtm(it_train, vectorizer_bigram)
+dim(dtm_train_bigram)
+
+dtm_test_bigram  <- create_dtm(it_test, vectorizer_bigram)
+dim(dtm_test_bigram)
+```
+## TF-IDF 기반의 DTM 생성
+
+대통령 연설문에서는 대부분 “존경하는 국민 여러분”으로 시작할 것입니다. 그러므로 “존경하는”이라는 term은 모든 연설문에 포함되기 때문에 term frequency와 document term frequency가 상당히 클 것입니다. 그러나 이 term으로 세명의 전직 대통령의 연설문을 구분하기 어렵습니다. 세명의 전직 대통령이 즐겨 사용하는 단어이기 때문입니다. 즉, term frequency와 document term frequency가 상당히 큰 terms은 모델 개발에 의미가 없는 terms인 것입니다.
+
+TF-IDF는 단일문서, 혹은 소수의 문서에서 의미가 있는 terms의 가중치를 높이고 대부분의 문서에서 발현하는 terms의 가중치를 줄이는 용도로 만들어진 측도입니다. 그러므로 DTM에 TF-IDF 변환을 수행하면 모델의 성능이 개선됩니다.
+
+Text Anaytics에서는 documents의 길이의 차이가 있으면, 상대적으로 짧거나 긴 documents에서 발현하는 terms들로 인해서 frequency scale에 왜곡이 있을 수 있습니다. 이 경우에는 표준화를 수행해야 합니다. 그런데 TF-IDF 변환은 자동으로 표준화가 되기 때문에 표준화의 잇점이 있습니다. 만약 표준화를 수행하려면, normalize() 함수를 사용하면 됩니다.
+
+### DTM의 TF-IDF 변환
+
+TfIdf class와 fit_transform() 함수를 이용해서 DTM에 TF-IDF 변환을 수행합니다.
+
+```{r}
+tfidf <- TfIdf$new()
+
+dtm_train_tfidf <- fit_transform(dtm_train_tf, tfidf)
+dtm_test_tfidf <- fit_transform(dtm_test_tf, tfidf) 
+```
+
+## DTM의 크기 비교
+
+세가지 방법으로 만들어진 DTM의 크기를 비교해 봅니다.
+비교 결과 bi-grams으로 만들어진 DTM은 다른 DTM보다 크기가 작은 것을 확인할 수 있었습니다.
+
+```{r}
+dim(dtm_train_tf)
+dim(dtm_train_bigram)
+dim(dtm_train_tfidf)
+```
+## Frequency 기반 모델링
+
+모든 terms을 모델의 독립변수로 사용하려 하기 때문에, terms의 개수가 독립변수의 개수와 같게 됩니다. 이 경우에는 over-fitting의 이슈가 발생하므로 이를 해결하기 위해서 over-fitting을 방지해주는 LASSO 모델을 사용하기로 합니다. 또한 target 변수가 binary가 아닌 3개의 class이기 때문에 family 함수는 “multinomial”을 지정합니다. 즉, multinomial logistic regression의 알고리즘에 기반한 LASSO 모델을 만듭니다.
+
+LASSO 모델을 생성하기 위해서는 cv.glmnet() 함수에서 penalty값인 alpha의 값을 1로 지정해야 LASSO Generalized Linear Model로 모델이 만들어집니다. alpha의 값이 0이면 Ridge Generalized Linear Model, 0.5이면 Elastic Net Regularized Generalized Linear Model이 생성됩니다.
+
+type.measure은 cross-validation을 위한 loss값 계산에 사용하는 측도를 지원합니다. 일반적으로 binomial family 함수의 경우에는 type.measure 인수를 AUC(Area Under Curve)인 “auc”를 사용하지만, multinomial family 함수의 경우에는 이를 사용할 수 없기 때문에 여기서는 “deviance”를 사용하였습니다. 이 값이 기본값입니다.
+
+그리고 “auc”를 지정해서 알아서 적당한 측도로 모델을 수행합니다.
+
+그리고 k-folds cross-validation의 k의 값은 10으로 지정하여, 10-fold cross-validation을 수행하여 over-fitting 또한 방지하도록 합니다.
+
+### 모델 생성
+
+```{r}
+NFOLDS <- 10
+
+classifier <- cv.glmnet(x = dtm_train_tf, y = train$president, 
+                        family = 'multinomial', 
+                        alpha = 1,
+                        type.measure = "deviance",
+                        nfolds = NFOLDS,
+                        thresh = 0.001,
+                        maxit = 1000,
+                        parallel = TRUE)
+```
+
+### 모델의 평가
+
+test 데이터로 평가한 결과 Accuracy가 0.7717로 나타났습니다.
+
+```{r}
+pred_voca <- predict(classifier, dtm_test_tf, type = 'response')[, , 1]
+president_voca <- apply(pred_voca, 1, 
+                        function(x) colnames(pred_voca)[which(max(x) == x)])
+
+cmat_voca <- confusionMatrix(factor(president_voca), factor(test$president))
+cmat_voca
+```
+## N-Grams 기반 모델링
+### 모델 생성
+
+```{r}
+classifier <- cv.glmnet(x = dtm_train_bigram, y = train$president, 
+                        family = 'multinomial', 
+                        type.measure = "deviance",
+                        alpha = 1,                        
+                        nfolds = NFOLDS,
+                        parallel = TRUE)
+```
+
+### 모델의 평가
+
+test 데이터로 평가한 결과 Accuracy가 0.7717로 나타났습니다.
+
+```{r}
+pred_bigram <- predict(classifier, dtm_test_bigram, type = 'response')[, , 1]
+
+president_bigram <- apply(pred_bigram, 1, 
+                          function(x) colnames(pred_bigram)[which(max(x) == x)])
+
+cmat_bigram <- confusionMatrix(factor(president_bigram), factor(test$president))
+cmat_bigram
+```
+
+## TF-IDF 기반의 모델
+### 모델 생성
+
+```{r}
+classifier <- cv.glmnet(x = dtm_train_tfidf, y = train$president, 
+                        family = 'multinomial', 
+                        nfolds = NFOLDS,
+                        thresh = 1e-3,
+                        maxit = 1e3,
+                        parallel = TRUE)
+```
+### 모델의 평가
+
+test 데이터로 평가한 결과 Accuracy가 0.7935로 나타났습니다.
+
+```{r}
+pred_tfidf <- predict(classifier, dtm_test_tfidf, type = 'response')[, , 1]
+
+president_tfidf <- apply(pred_tfidf, 1, 
+                         function(x) colnames(pred_tfidf)
+                         [which(max(x) == x)])
+
+cmat_tfidf <- confusionMatrix(factor(president_tfidf), factor(test$president))
+cmat_tfidf
+```
+## 모델 성능의 비교
+
+모델 성능 비교결과 TF-IDF > Bigram(Pruned) = Frequency의 순서로 나타났습니다.
+
+```{r}
+accuracy <- rbind(cmat_voca$overall, cmat_bigram$overall, 
+                  cmat_tfidf$overall) %>%
+  round(3)
+
+data.frame(Method = c("Frequency", "Bigram", "TF-IDF"),
+           accuracy) %>%
+  arrange(desc(Accuracy)) %>%
+  knitr::kable()
+
 ```
