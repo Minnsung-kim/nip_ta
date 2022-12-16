@@ -792,7 +792,6 @@ code span.wa { color: #5e5e5e; font-style: italic; } /* Warning */
   d-article table.gt_table td,
   d-article table.gt_table th {
     border-bottom: none;
-    font-size: 100%;
   }
 
   .html-widget {
@@ -1865,21 +1864,15 @@ code span.wa { color: #5e5e5e; font-style: italic; } /* Warning */
 
       // hoverable references
       $('span.citation[data-cites]').each(function() {
-        const citeChild = $(this).children()[0]
-        // Do not process if @xyz has been used without escaping and without bibliography activated
-        // https://github.com/rstudio/distill/issues/466
-        if (citeChild === undefined) return true
-
-        if (citeChild.nodeName == "D-FOOTNOTE") {
-          var fn = citeChild
+        if ($(this).children()[0].nodeName == "D-FOOTNOTE") {
+          var fn = $(this).children()[0]
           $(this).html(fn.shadowRoot.querySelector("sup"))
           $(this).id = fn.id
           fn.remove()
         }
         var refs = $(this).attr('data-cites').split(" ");
         var refHtml = refs.map(function(ref) {
-          // Could use CSS.escape too here, we insure backward compatibility in navigator
-          return "<p>" + $('div[id="ref-' + ref + '"]').html() + "</p>";
+          return "<p>" + $('#ref-' + ref).html() + "</p>";
         }).join("\n");
         window.tippy(this, {
           allowHTML: true,
@@ -2155,7 +2148,8 @@ code span.wa { color: #5e5e5e; font-style: italic; } /* Warning */
   /*-- Additional custom styles --*/
   /* Add any additional CSS rules below                      */
   </style>
-  <style type="text/css">
+  <style type="text/css">@import url(https://cdn.jsdelivr.net/gh/moonspam/NanumSquare@2.0/nanumsquare.css);
+  @import url(https://cdn.jsdelivr.net/gh/joungkyun/font-d2coding/d2coding.css);
   /* base variables */
 
   /* Edit the CSS properties in this file to create a custom
@@ -2193,7 +2187,7 @@ code span.wa { color: #5e5e5e; font-style: italic; } /* Warning */
     --fig-cap-color:   rgba(0, 0, 0, 0.6);
     /*-- Specify custom fonts ~~~ must be imported above   --*/
     --heading-font:    sans-serif;
-    --mono-font:       monospace;
+    --mono-font:       D2coding;
     --body-font:       sans-serif;
     --navbar-font:     sans-serif;  /* websites + blogs only */
   }
@@ -2515,7 +2509,7 @@ code span.wa { color: #5e5e5e; font-style: italic; } /* Warning */
     color: var(--hover-color, white);
   }</style>
   <!--/radix_placeholder_distill-->
-  <script src="site_libs/header-attrs-2.16/header-attrs.js"></script>
+  <script src="site_libs/header-attrs-2.14/header-attrs.js"></script>
   <script src="site_libs/popper-2.6.0/popper.min.js"></script>
   <link href="site_libs/tippy-6.2.7/tippy.css" rel="stylesheet" />
   <link href="site_libs/tippy-6.2.7/tippy-light-border.css" rel="stylesheet" />
@@ -2535,7 +2529,7 @@ code span.wa { color: #5e5e5e; font-style: italic; } /* Warning */
 <!--radix_placeholder_front_matter-->
 
 <script id="distill-front-matter" type="text/json">
-{"title":"텍스트 데이터 분석","description":"“내가 생각하는 텍스트 분석과 기대하는 텍스트 분석을 정리해 봅니다.”","authors":[{"author":"김민성","authorURL":"https://minnsung-kim.github.io","affiliation":"명지대","affiliationURL":"#","orcidID":""}],"publishedDate":"2022-10-01T00:00:00.000+00:00","citationText":"김민성, 2022"}
+{"title":"텍스트 데이터 분석","description":"“내가 생각하는 텍스트 분석과 기대하는 텍스트 분석을 정리해 봅니다.”","authors":[{"author":"김민성","authorURL":"https://minnsung-kim.github.io","affiliation":"명지대","affiliationURL":"#","orcidID":""}],"publishedDate":"2022-10-01T00:00:00.000+09:00","citationText":"김민성, 2022"}
 </script>
 
 <!--/radix_placeholder_front_matter-->
@@ -2571,11 +2565,13 @@ code span.wa { color: #5e5e5e; font-style: italic; } /* Warning */
 <h1>텍스트 데이터 분석</h1>
 <!--radix_placeholder_categories-->
 <!--/radix_placeholder_categories-->
-<p><p>“내가 생각하는 텍스트 분석과 기대하는 텍스트 분석을 정리해 봅니다.”</p></p>
+<p><p>“내가 생각하는 텍스트 분석과 기대하는 텍스트 분석을 정리해
+봅니다.”</p></p>
 </div>
 
 <div class="d-byline">
-  김민성 <a href="https://minnsung-kim.github.io" class="uri">https://minnsung-kim.github.io</a> (명지대)
+  김민성 <a href="https://minnsung-kim.github.io"
+class="uri">https://minnsung-kim.github.io</a> (명지대)
   
 <br/>2022-10-01
 </div>
@@ -2585,18 +2581,24 @@ code span.wa { color: #5e5e5e; font-style: italic; } /* Warning */
 <nav class="l-text toc figcaption" id="TOC">
 <h3>Contents</h3>
 <ul>
-<li><a href="#내가-기대하는-텍스트-분석" id="toc-내가-기대하는-텍스트-분석">내가 기대하는 텍스트 분석</a></li>
+<li><a href="#내가-기대하는-텍스트-분석">내가 기대하는 텍스트
+분석</a></li>
 </ul>
 </nav>
 </div>
 <h1 id="내가-기대하는-텍스트-분석">내가 기대하는 텍스트 분석</h1>
-<p>2021년 국가기록원의 비공개기록물 공개재분류 R&amp;D사업에 참여하여 간단한 키워드 추출 작업을 했던 적이 있습니다. 그 때 당시 기록물들에 대한 제대로 된 분석이 있으면 다양하게 활용을 할 수도 있다는 생각을 하였습니다.
-이러한 경험과 기록학을 배우는 학생으로써 앞으로 기록을 관리하고 서비스하는 데에 텍스트 분석을 많이 활용하여 기록관리 분야가 좀 더 발전하기를 기대합니다.</p>
+<p>2021년 국가기록원의 비공개기록물 공개재분류 R&amp;D사업에 참여하여
+간단한 키워드 추출 작업을 했던 적이 있습니다. 그 때 당시 기록물들에 대한
+제대로 된 분석이 있으면 다양하게 활용을 할 수도 있다는 생각을
+하였습니다. 이러한 경험과 기록학을 배우는 학생으로써 앞으로 기록을
+관리하고 서비스하는 데에 텍스트 분석을 많이 활용하여 기록관리 분야가 좀
+더 발전하기를 기대합니다.</p>
 <p><br></p>
 <div class="layout-chunk" data-layout="l-body">
 <p><img src="img/9154.jpg" width="55%" style="display: block; margin: auto;" /></p>
 </div>
-<div class="sourceCode" id="cb1"><pre class="sourceCode r distill-force-highlighting-css"><code class="sourceCode r"></code></pre></div>
+<div class="sourceCode" id="cb1"><pre
+class="sourceCode r distill-force-highlighting-css"><code class="sourceCode r"></code></pre></div>
 <!--radix_placeholder_article_footer-->
 <!--/radix_placeholder_article_footer-->
 </div>

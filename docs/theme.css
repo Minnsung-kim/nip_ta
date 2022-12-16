@@ -1,4 +1,5 @@
-
+@import url(https://cdn.jsdelivr.net/gh/moonspam/NanumSquare@2.0/nanumsquare.css);
+@import url(https://cdn.jsdelivr.net/gh/joungkyun/font-d2coding/d2coding.css);
 /* base variables */
 
 /* Edit the CSS properties in this file to create a custom
@@ -36,7 +37,7 @@ html {
   --fig-cap-color:   rgba(0, 0, 0, 0.6);
   /*-- Specify custom fonts ~~~ must be imported above   --*/
   --heading-font:    sans-serif;
-  --mono-font:       monospace;
+  --mono-font:       D2coding;
   --body-font:       sans-serif;
   --navbar-font:     sans-serif;  /* websites + blogs only */
 }
